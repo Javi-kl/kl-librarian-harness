@@ -2,7 +2,7 @@
 	- Agente que gestiona vault de .md, runtime prestado, single-user, sin RAG.
 ---
 ## Mapa
- ### Este mapa esta vivo y necesita adaptarse y actualizarse de forma continau, por ej, las acciones son corregibles o matizables.
+ ### Este mapa esta vivo y necesita adaptarse y actualizarse de forma continu, por ej, las acciones son corregibles o matizables.
   ```
   Acciones (dominio)      ← Duplicados · Corregir · Reorganizar…
   Guardrails / Permisos   ← envuelve acciones: nada se escribe sin aprobación
@@ -34,6 +34,6 @@
   porque:: es el estándar de la industria, cada tool tiene blast radius acotado y auditable, y la seguridad se concentra en la capa de permisos (pieza profunda del proyecto).
   trade-off:: aceptar que el agente no elija bien las secuencias -- mitigando ese riesgo con reglas en código.
  ## ADR-005
-  decisión:: Guardrails F1: política de aprobación de 3 niveles (leer libre, escribir pide, borrar pide SIEMPRE) + reglas en código: read-before-wirte (no mutar un path no leído en la ejecución) y borrado = mover a trash/
+  decisión:: Guardrails F1: política de aprobación de 3 niveles (leer libre, escribir pide, borrar pide SIEMPRE) + reglas en código: read-before-wrte (no mutar un path no leído en la ejecución) y borrado = mover a trash/
   porque:: la seguridad se hace cumplir en código, no en el prompt del modelo: el prompt se puede eludir. La papelera hace reversible el borrado por error.
   alternativa:: auto-aprobar escritura y preguntar solo por borrado - descartada: deja pasar sobrescrituras malas sin revisión; reabrir con más capas en futuras fases del proyecto.
