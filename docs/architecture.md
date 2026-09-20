@@ -6,7 +6,7 @@
   ```
   Acciones (dominio)      ← Duplicados · Corregir · Reorganizar…
   Guardrails / Permisos   ← envuelve acciones: nada se escribe sin aprobación
-  Herramientas            ← acceso al vault: texto · estructura · fuzzy
+  Herramientas            ← acceso al vault: texto
   Runtime (prestado)      ← bucle Pydantic AI
   ─────────────────────────────────────────────
   Transversales: contexto (rellena el prompt) · sesión (estado entre runs)
