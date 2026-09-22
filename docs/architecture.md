@@ -15,7 +15,7 @@
 
 ---
 # ADRs
- ## ADR-001 -- pendiente de cerrar
+ ## ADR-001
   decisión:: Pydantic AI como runtime.
   porque:: Por coherencia con mi stack actual y el beneficio que conlleva, además de poder centrarme en aprender otros conceptos, me sirve una calidad estandar, no necesito lo mas top en este punto.
   trade-off:: quizas no sea el mejor haciendo esa función, falta investigar este punto mejor.
@@ -26,7 +26,7 @@
   trade-off:: no aprender otras arquitecturas, riesgo de shared/ demasiado grande.
   alternativa:: monolito clásico (desorganizado si crece) y microservicios (complejidad para single-user)
  ## ADR-003
-  decisión:: tool buscar_texto(términos) en Python; output = top 15 notas {path, título, contenido, hits} ordenadas por hits".
+  decisión:: tool search_text(términos) en Python; output = top 15 notas con hits > 0 {path, título, contenido, hits} ordenadas por hits".
   porque:: grep no normaliza acentos/case → igual habría que preprocesar con Python + ya que iteramos, devolvemos la nota completa con estructura, porque la acción (duplicados) compara contenido y el agente juzga sobre notas completas.
   trade-off:: coste de parsear y buscar en todos los archivos en cada llamada del modelo a la tool.; dejar archivos fuera por demasiadas coincidencias.
  ## ADR-004
