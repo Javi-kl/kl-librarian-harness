@@ -42,7 +42,8 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
             )
             notes_list.append(note)
 
-    return notes_list
+    order_notes = sorted(notes_list, key=lambda n: -n.hits)
+    return order_notes
 
 
 def search_text(terms: list[str]) -> list[NoteHit]:

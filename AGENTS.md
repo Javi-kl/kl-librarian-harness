@@ -37,7 +37,7 @@ Ejecutar los checks que apliquen al cambio y reportar el resultado. Si algo fall
 
 ## Tests
 - `pytest`. Un archivo por módulo.
-- Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_hits__returns_top_15_sorted_by_hits`.
+- Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_notes_with_hits__returns_top_15_sorted_by_hits`.
 - Deterministas: sin llamadas reales a APIs de modelos.
 - Bug: primero el test que lo reproduce, después el arreglo.
 
