@@ -59,3 +59,21 @@ def test_find_hits__more_than_15_notes__returns_top_15_sorted_by_hits(
         for k in range(16, 1, -1)
     ]
     assert notes == expected
+
+
+def test_find_hits__equal_hits__returns_sorted_by_path_asc(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["contenedores"], limit=15)
+    assert notes == [
+        NoteHit(
+            path="pages/kubernetes.md",
+            title="kubernetes",
+            content="# Kubernetes\nOrquestador de contenedores.",
+            hits=1,
+        ),
+        NoteHit(
+            path="pages/podman.md",
+            title="podman",
+            content="# Podman\nContenedores.",
+            hits=1,
+        ),
+    ]

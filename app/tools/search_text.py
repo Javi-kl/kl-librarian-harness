@@ -20,7 +20,6 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
     Primero hits descendente (el -), y en empate, path ascendente.
     Coincidencia = palabra/frase completa.
     """
-    # ej: sorted(notes, key=lambda n: (-n.hits, n.path)) TODO REPASAR COMPRENSION.
     # TODO Limpiar duplicados en el input 'terms' después de normalizar.
     # TODO Buscamos por límite de palabra (\b)regex
     notes_list = []
@@ -42,7 +41,7 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
             )
             notes_list.append(note)
 
-    order_notes = sorted(notes_list, key=lambda n: -n.hits)[:limit]
+    order_notes = sorted(notes_list, key=lambda n: (-n.hits, n.path))[:limit]
     return order_notes
 
 
