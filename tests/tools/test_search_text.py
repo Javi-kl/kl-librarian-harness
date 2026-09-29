@@ -61,7 +61,9 @@ def test_find_hits__more_than_15_notes__returns_top_15_sorted_by_hits(
     assert notes == expected
 
 
-def test_find_hits__equal_hits__returns_sorted_by_path_asc(tmp_vault_path: Path):
+def test_find_hits__equal_hits__returns_sorted_by_path_asc(
+    tmp_vault_path: Path,
+):
     notes = find_hits(tmp_vault_path, ["contenedores"], limit=15)
     assert notes == [
         NoteHit(
@@ -77,3 +79,29 @@ def test_find_hits__equal_hits__returns_sorted_by_path_asc(tmp_vault_path: Path)
             hits=1,
         ),
     ]
+
+
+def test_find_hits__term_is_substring_of_word__counts_only_exact_matches(
+    tmp_vault_path: Path,
+):
+    notes = find_hits(tmp_vault_path, ["contenedor"], limit=15)
+    assert notes == []
+
+
+def test_find_hits__multi_word_term__counts_phrase_occurrences(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["de contenedores", "orquestador de"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="pages/kubernetes.md",
+            title="kubernetes",
+            content="# Kubernetes\nOrquestador de contenedores.",
+            hits=2,
+        )
+    ]
+
+
+def test_find_hits__phrase_almost_present__returns_empty_list(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["de contenedor"], limit=15)
+
+    assert notes == []
