@@ -14,7 +14,8 @@ def _normalize_page_content(content: str) -> str:
 
 
 def _normalize_terms(terms: list[str]) -> list[str]:
-    return [term.lower() for term in terms]
+    normalized_terms = [term.lower() for term in terms]
+    return list(set(normalized_terms))
 
 
 def _count_word_hits(content: str, term: str) -> int:

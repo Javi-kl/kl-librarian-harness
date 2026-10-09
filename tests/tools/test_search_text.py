@@ -105,3 +105,16 @@ def test_find_hits__phrase_almost_present__returns_empty_list(tmp_vault_path: Pa
     notes = find_hits(tmp_vault_path, ["de contenedor"], limit=15)
 
     assert notes == []
+
+
+def test_find_hits__duplicated_terms__counts_each_term_once(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["Orquestador", "orquestador"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="pages/kubernetes.md",
+            title="kubernetes",
+            content="# Kubernetes\nOrquestador de contenedores.",
+            hits=1,
+        )
+    ]
