@@ -118,3 +118,44 @@ def test_find_hits__duplicated_terms__counts_each_term_once(tmp_vault_path: Path
             hits=1,
         )
     ]
+
+
+def test_find_hits__term_without_accent__matches_accented_word(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["busqueda"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="pages/linux.md",
+            title="linux",
+            content="# Linux\nComo hacer una búsqueda con grep.",
+            hits=1,
+        )
+    ]
+
+
+def test_find_hits__term_with_accent__matches_word_without_accent(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["cómo"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="pages/linux.md",
+            title="linux",
+            content="# Linux\nComo hacer una búsqueda con grep.",
+            hits=1,
+        )
+    ]
+
+
+def test_find_hits__non_ascii_term__matches_note_containing_it(
+    tmp_no_ascii_vault_path: Path,
+):
+    notes = find_hits(tmp_no_ascii_vault_path, ["日本"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="pages/japones.md",
+            title="japones",
+            content="# Japones\n日本",
+            hits=1,
+        )
+    ]

@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from pathlib import Path
 
@@ -8,13 +9,19 @@ from app.tools.schemas import NoteHit
 MAX_NOTES_LENGTH = 15
 
 
-# TODO TDD Quitar acentos.
+def _normalize_word_accents(words: str) -> str:
+    break_down_words = unicodedata.normalize("NFD", words)
+    return re.sub(r"[\u0300-\u036f]", "", break_down_words)
+
+
 def _normalize_page_content(content: str) -> str:
-    return content.lower()
+    normalized_content = _normalize_word_accents(content)
+    return normalized_content.lower()
 
 
+# TODO Caso de la 'ñ'. Actualmente es transformada en 'n'
 def _normalize_terms(terms: list[str]) -> list[str]:
-    normalized_terms = [term.lower() for term in terms]
+    normalized_terms = (_normalize_word_accents(term.lower()) for term in terms)
     return list(set(normalized_terms))
 
 
@@ -28,7 +35,6 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
     Primero hits descendente (el -), y en empate, path ascendente.
     Coincidencia = palabra/frase completa.
     """
-    # TODO TDD Limpiar duplicados en el input 'terms' después de normalizar.
     notes_list = []
     page_paths = vault_path.rglob("*.md")
     normalized_terms = _normalize_terms(terms)
