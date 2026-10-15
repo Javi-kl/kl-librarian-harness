@@ -21,13 +21,19 @@ def _normalize_page_content(content: str) -> str:
 
 # TODO Caso de la 'ñ'. Actualmente es transformada en 'n'
 def _normalize_terms(terms: list[str]) -> list[str]:
-    normalized_terms = (_normalize_word_accents(term.lower()) for term in terms)
-    return list(set(normalized_terms))
+    normalized_terms = {
+        _normalize_word_accents(term.lower().strip()) for term in terms if term.strip()
+    }
+    return list(normalized_terms)
 
 
+# TODO Comprobar si funciona bien con terminos como: 'C++'
 def _count_word_hits(content: str, term: str) -> int:
-    pattern = r"\b" + re.escape(term) + r"\b"
-    return len(re.findall(pattern, content))
+    if term != "":
+        pattern = r"\b" + re.escape(term) + r"\b"
+        return len(re.findall(pattern, content))
+    else:
+        return 0
 
 
 def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
