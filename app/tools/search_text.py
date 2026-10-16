@@ -67,15 +67,18 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
 
 def search_text(terms: list[str]) -> list[NoteHit]:
     """
-    Busca en el vault notas que contengan alguno de los términos dados.
-    Úsala para localizar contenido.
-    terms=lista de palabras o frases cortas, una nota entra si contiene al menos uno.
-    Además los términos coinciden como palabras/frases completas: no se detectan plurales
-    ni variantes. Si las necesitas, inclúyelas tú en la lista(p. ej. casa, casas).
-    Siempre devuelve lista, si no hay coincidencias, [].
-    Ordenada por hits descendente, maximo 15 notas.
-    path=relativo a la raíz del vault,
-    title=nombre del archivo sin extensión, content=text completo,
-    hits=suma de apariciones de todos los términos, ignorando mayúsculas y acentos.
+    Busca texto en notas .md del vault y sus subcarpetas.
+
+    Args:
+        terms: Palabras/frases completas; basta una coincidencia. Ignora
+            mayúsculas y acentos; no expande variantes (incluye "casa" y
+            "casas" si necesitas ambas).
+
+    Returns:
+        list[NoteHit]: Hasta 15 notas; [] sin coincidencias. Orden por hits
+            descendente y path ascendente en empates.
+            path: ruta relativa al vault; title: nombre sin extensión;
+            content: texto completo sin normalizar;
+            hits: suma de apariciones de los términos normalizados distintos.
     """
     return find_hits(get_settings().KB_VAULT_PATH, terms, MAX_NOTES_LENGTH)
