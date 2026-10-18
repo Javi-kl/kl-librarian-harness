@@ -37,9 +37,10 @@ Ejecutar los checks que apliquen al cambio y reportar el resultado. Si algo fall
 
 ## Tests
 - `pytest`. Un archivo por módulo.
-- Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_hits__returns_top_15_sorted_by_hits`.
+- Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_notes_with_hits__returns_top_15_sorted_by_hits`.
 - Deterministas: sin llamadas reales a APIs de modelos.
 - Bug: primero el test que lo reproduce, después el arreglo.
+- Priorizar tests esenciales, claros y fáciles de revisar: cada caso debe proteger un comportamiento relevante, no aumentar cobertura por sí sola. Evitar matrices de casos, fixtures o abstracciones innecesarias; explicar qué protege cada test propuesto antes de añadirlo.
 
 ## Flujo y permisos (estrictos)
 - Sin permiso explícito no se modifica ni se crea nada: primero explicar y proponer.
