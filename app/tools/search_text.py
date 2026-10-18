@@ -10,8 +10,9 @@ MAX_NOTES_LENGTH = 15
 
 
 def _normalize_word_accents(words: str) -> str:
-    break_down_words = unicodedata.normalize("NFD", words)
-    return re.sub(r"[\u0300-\u036f]", "", break_down_words)
+    decomposed_text = unicodedata.normalize("NFD", words)
+    text_with_enye = decomposed_text.replace("n\u0303", "ñ").replace("N\u0303", "Ñ")
+    return re.sub(r"[\u0300-\u036f]", "", text_with_enye)
 
 
 def _normalize_page_content(content: str) -> str:
@@ -19,7 +20,6 @@ def _normalize_page_content(content: str) -> str:
     return normalized_content.lower()
 
 
-# TODO Caso de la 'ñ'. Actualmente es transformada en 'n'
 def _normalize_terms(terms: list[str]) -> list[str]:
     normalized_terms = {
         _normalize_word_accents(term.lower().strip()) for term in terms if term.strip()
@@ -27,10 +27,9 @@ def _normalize_terms(terms: list[str]) -> list[str]:
     return list(normalized_terms)
 
 
-# TODO Comprobar si funciona bien con terminos como: 'C++'
 def _count_word_hits(content: str, term: str) -> int:
     if term != "":
-        pattern = r"\b" + re.escape(term) + r"\b"
+        pattern = r"(?<!\w)" + re.escape(term) + r"(?!\w)"
         return len(re.findall(pattern, content))
     else:
         return 0
@@ -44,6 +43,9 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
     notes_list = []
     page_paths = vault_path.rglob("*.md")
     normalized_terms = _normalize_terms(terms)
+    if not normalized_terms:
+        return []
+
     for page in page_paths:
         content = page.read_text()
         normalized_content = _normalize_page_content(content)
@@ -67,15 +69,21 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
 
 def search_text(terms: list[str]) -> list[NoteHit]:
     """
-    Busca en el vault notas que contengan alguno de los términos dados.
-    Úsala para localizar contenido.
-    terms=lista de palabras o frases cortas, una nota entra si contiene al menos uno.
-    Además los términos coinciden como palabras/frases completas: no se detectan plurales
-    ni variantes. Si las necesitas, inclúyelas tú en la lista(p. ej. casa, casas).
-    Siempre devuelve lista, si no hay coincidencias, [].
-    Ordenada por hits descendente, maximo 15 notas.
-    path=relativo a la raíz del vault,
-    title=nombre del archivo sin extensión, content=text completo,
-    hits=suma de apariciones de todos los términos, ignorando mayúsculas y acentos.
+    Busca texto en notas .md del vault y sus subcarpetas.
+    Devuelve notas que contengan al menos uno de los términos.
+
+    Args:
+        terms: Términos o frases literales. Ignora mayúsculas y acentos,
+            pero distingue ñ de n. Una coincidencia no puede tener letras,
+            números o "_" inmediatamente antes o después:
+            "C++" coincide en "(C++)", pero no en "C++17".
+            No expande variantes: incluye "casa" y "casas" si necesitas ambas.
+
+    Returns:
+        list[NoteHit]: Hasta 15 notas; [] sin coincidencias. Orden por hits
+            descendente y path ascendente en empates.
+            path: ruta relativa al vault; title: nombre sin extensión;
+            content: texto completo sin normalizar;
+            hits: suma de apariciones de los términos normalizados distintos.
     """
     return find_hits(get_settings().KB_VAULT_PATH, terms, MAX_NOTES_LENGTH)

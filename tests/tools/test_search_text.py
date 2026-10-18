@@ -159,3 +159,74 @@ def test_find_hits__non_ascii_term__matches_note_containing_it(
             hits=1,
         )
     ]
+
+
+def test_find_hits__blank_terms__returns_empty_list(tmp_vault_path: Path):
+    notes = find_hits(tmp_vault_path, ["", "   "], limit=15)
+
+    assert notes == []
+
+
+def test_find_hits__terms_with_symbols__counts_literal_matches(tmp_path: Path):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    (vault_path / "lenguajes.md").write_text(
+        "# lenguajes\nUso C++, C# y .NET.", encoding="utf-8"
+    )
+    notes = find_hits(tmp_path, ["C++", "C#", ".NET"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="vault/lenguajes.md",
+            title="lenguajes",
+            content="# lenguajes\nUso C++, C# y .NET.",
+            hits=3,
+        )
+    ]
+
+
+def test_find_hits__terms_inside_longer_names__returns_empty_list(tmp_path: Path):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    (vault_path / "lenguajes.md").write_text(
+        "# lenguajes\nUso C++17 y .NETCore.", encoding="utf-8"
+    )
+    notes = find_hits(tmp_path, ["C++", ".NET"], limit=15)
+
+    assert notes == []
+
+
+def test_find_hits__term_with_enye__does_not_match_plain_n(tmp_path: Path):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    (vault_path / "cumpleaños.md").write_text(
+        "# Cumpleaños\nano y año.", encoding="utf-8"
+    )
+    notes = find_hits(tmp_path, ["año"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="vault/cumpleaños.md",
+            title="cumpleaños",
+            content="# Cumpleaños\nano y año.",
+            hits=1,
+        )
+    ]
+
+
+def test_find_hits__decomposed_enye_in_content__matches_composed_term(tmp_path: Path):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    (vault_path / "cumpleaños.md").write_text(
+        "# Cumpleaños\nan\u0303o.", encoding="utf-8"
+    )
+    notes = find_hits(tmp_path, ["año"], limit=15)
+
+    assert notes == [
+        NoteHit(
+            path="vault/cumpleaños.md",
+            title="cumpleaños",
+            content="# Cumpleaños\nan\u0303o.",
+            hits=1,
+        )
+    ]
