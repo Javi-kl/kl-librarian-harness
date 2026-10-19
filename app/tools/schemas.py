@@ -21,3 +21,15 @@ class EditNoteFailure(BaseModel):
     ok: Literal[False]
     path: str
     error: list[str]
+
+
+class DeleteNoteSuccess(BaseModel):
+    ok: Literal[True]
+    path: str
+    trash_path: str
+
+
+class DeleteNoteFailure(BaseModel):
+    ok: Literal[False]
+    path: str
+    error: list[str]
