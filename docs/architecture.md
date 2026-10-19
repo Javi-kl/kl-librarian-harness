@@ -34,6 +34,6 @@
   porque:: es el estándar de la industria, cada tool tiene blast radius acotado y auditable, y la seguridad se concentra en la capa de permisos (pieza profunda del proyecto).
   trade-off:: aceptar que el agente no elija bien las secuencias -- mitigando ese riesgo con reglas en código.
  ## ADR-005
-  decisión:: Guardrails F1: política de aprobación de 3 niveles (leer libre, escribir pide, borrar pide SIEMPRE) + reglas en código: read-before-wrte (no mutar un path no leído en la ejecución) y borrado = mover a trash/
-  porque:: la seguridad se hace cumplir en código, no en el prompt del modelo: el prompt se puede eludir. La papelera hace reversible el borrado por error.
+  decisión:: Guardrails F1: política de aprobación de 3 niveles (leer libre, escribir pide, borrar pide SIEMPRE) + reglas en código: read-before-wrte (no mutar un path no leído en la ejecución) y borrado = mover a vault/trash/ renombrando a `<nombre>.md.trash` (contador `.1`, `.2` si el nombre ya está ocupado; nunca se sobrescribe)
+  porque:: la seguridad se hace cumplir en código, no en el prompt del modelo: el prompt se puede eludir. La papelera hace reversible el borrado por error (renombrar de vuelta a `.md` lo recupera) y el rename es atómico dentro del vault. El sufijo va DESPUÉS de `.md` a propósito: así `search_text` (rglob "*.md") no vuelve a encontrar lo borrado y RF-03 C4 se cumple sin tocar la búsqueda.
   alternativa:: auto-aprobar escritura y preguntar solo por borrado - descartada: deja pasar sobrescrituras malas sin revisión; reabrir con más capas en futuras fases del proyecto.

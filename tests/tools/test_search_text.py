@@ -4,6 +4,23 @@ from app.tools.schemas import NoteHit
 from app.tools.search_text import find_hits
 
 
+def test_find_hits__symlink_to_external_note__returns_only_internal_note(
+    tmp_path: Path,
+):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    (vault_path / "internal.md").write_text("kubernetes", encoding="utf-8")
+    external_path = tmp_path / "external.md"
+    external_path.write_text("kubernetes externo", encoding="utf-8")
+    (vault_path / "linked.md").symlink_to(external_path)
+
+    notes = find_hits(vault_path, ["kubernetes"], limit=15)
+
+    assert notes == [
+        NoteHit(path="internal.md", title="internal", content="kubernetes", hits=1)
+    ]
+
+
 def test_find_hits__no_matches__returns_empty_list(tmp_vault_path: Path):
     notes = find_hits(tmp_vault_path, ["inexistente"], limit=15)
     assert notes == []

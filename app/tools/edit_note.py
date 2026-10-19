@@ -3,9 +3,6 @@ import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from app.shared.config import get_settings
-from app.tools.schemas import EditNoteFailure, EditNoteSuccess
-
 
 class EditNoteError(Exception):
     """Comunica los fallos previstos de una edicion, en orden de prioridad."""
@@ -88,43 +85,3 @@ def replace_note_content(vault_path: Path, path: str, content: str) -> int:
     finally:
         if temporary_path is not None:
             _cleanup_temporary(temporary_path, sys.exception())
-
-
-def edit_note(path: str, content: str) -> EditNoteSuccess | EditNoteFailure:
-    """
-    Reemplaza todo el texto de una nota Markdown existente.
-    No crea, borra ni mueve notas.
-
-    Args:
-        path: Ruta relativa al vault, como "pages/kubernetes.md".
-            Archivo .md existente, sin segmentos ".." ni enlaces simbólicos
-            en la nota o sus carpetas dentro del vault.
-        content: Texto final completo, no un fragmento ni un diff. Incluye
-            todo lo que deba conservarse. Se escribe en UTF-8 sin transformar
-            saltos de línea ni añadir uno final. "" deja el archivo vacío.
-
-    Returns:
-        EditNoteSuccess | EditNoteFailure: Resultado de la edición.
-            Éxito: {ok: true, path, verified: true, bytes}.
-            verified confirma coincidencia exacta con el texto solicitado
-            al releer la nota final; bytes es su tamaño en bytes.
-            Fallo: {ok: false, path, error: [códigos]}.
-            Primero aparece el fallo principal; después, el de limpieza si ocurre.
-            note_not_found: la nota no existe al comenzar.
-            invalid_path: ruta absoluta, con "..", con enlaces o destino
-                que no es un archivo .md.
-            permission_denied: el sistema deniega una operación por permisos.
-            file_operation_failed: otro fallo de operación con archivos.
-            temporary_verification_failed: contenido preparado distinto;
-                no se sustituye la original.
-            final_verification_failed: nota sustituida, pero no se pudo leer
-                o no coincide con lo solicitado; no se restaura automáticamente.
-            temporary_cleanup_failed: no se pudo eliminar el temporal.
-            Una respuesta de fallo no garantiza que la nota siga intacta.
-    """
-    vault_path = get_settings().KB_VAULT_PATH
-    try:
-        size = replace_note_content(vault_path, path, content)
-    except EditNoteError as error:
-        return EditNoteFailure(ok=False, path=path, error=error.codes)
-    return EditNoteSuccess(ok=True, path=path, verified=True, bytes=size)
