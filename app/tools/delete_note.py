@@ -1,8 +1,5 @@
 from pathlib import Path
 
-from app.shared.config import get_settings
-from app.tools.schemas import DeleteNoteFailure, DeleteNoteSuccess
-
 TRASH_DIR_NAME = "trash"
 TRASH_SUFFIX = ".md.trash"
 
@@ -64,37 +61,3 @@ def move_note_to_trash(vault_path: Path, path: str) -> str:
         raise DeleteNoteError(["permission_denied"]) from error
     except OSError as error:
         raise DeleteNoteError(["file_operation_failed"]) from error
-
-
-def delete_note(path: str) -> DeleteNoteSuccess | DeleteNoteFailure:
-    """
-    Mueve una nota Markdown a la papelera del vault; no la borra en firme.
-
-    Args:
-        path: Ruta relativa al vault, como "pages/kubernetes.md".
-            Archivo .md existente, sin segmentos ".." ni enlaces simbólicos
-            en la nota o sus carpetas dentro del vault.
-
-    Returns:
-        DeleteNoteSuccess | DeleteNoteFailure: Resultado del borrado.
-            Éxito: {ok: true, path, trash_path}.
-            trash_path: ruta relativa al vault donde queda la nota, con el
-                mismo nombre más ".trash" ("trash/kubernetes.md.trash").
-                Si ese nombre ya estaba ocupado por un borrado anterior,
-                se añade un contador (".1", ".2"...).
-                Renombrar el fichero de vuelta a ".md" recupera la nota.
-            Fallo: {ok: false, path, error: [códigos]}.
-            note_not_found: la nota no existe al comenzar.
-            invalid_path: ruta absoluta, con "..", con enlaces o destino
-                que no es un archivo .md; también si la papelera es un
-                enlace simbólico.
-            permission_denied: el sistema deniega una operación por permisos.
-            file_operation_failed: otro fallo de operación con archivos.
-            Si la validación falla, la nota no se mueve.
-    """
-    vault_path = get_settings().KB_VAULT_PATH
-    try:
-        trash_path = move_note_to_trash(vault_path, path)
-    except DeleteNoteError as error:
-        return DeleteNoteFailure(ok=False, path=path, error=error.codes)
-    return DeleteNoteSuccess(ok=True, path=path, trash_path=trash_path)

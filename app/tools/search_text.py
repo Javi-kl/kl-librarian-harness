@@ -3,7 +3,6 @@ import unicodedata
 
 from pathlib import Path
 
-from app.shared.config import get_settings
 from app.tools.schemas import NoteHit
 
 MAX_NOTES_LENGTH = 15
@@ -67,26 +66,3 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
 
     order_notes = sorted(notes_list, key=lambda n: (-n.hits, n.path))[:limit]
     return order_notes
-
-
-def search_text(terms: list[str]) -> list[NoteHit]:
-    """
-    Busca texto en notas .md del vault y sus subcarpetas.
-    Ignora archivos y carpetas que sean enlaces simbólicos.
-    Devuelve notas que contengan al menos uno de los términos.
-
-    Args:
-        terms: Términos o frases literales. Ignora mayúsculas y acentos,
-            pero distingue ñ de n. Una coincidencia no puede tener letras,
-            números o "_" inmediatamente antes o después:
-            "C++" coincide en "(C++)", pero no en "C++17".
-            No expande variantes: incluye "casa" y "casas" si necesitas ambas.
-
-    Returns:
-        list[NoteHit]: Hasta 15 notas; [] sin coincidencias. Orden por hits
-            descendente y path ascendente en empates.
-            path: ruta relativa al vault; title: nombre sin extensión;
-            content: texto completo sin normalizar;
-            hits: suma de apariciones de los términos normalizados distintos.
-    """
-    return find_hits(get_settings().KB_VAULT_PATH, terms, MAX_NOTES_LENGTH)

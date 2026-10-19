@@ -2,9 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from app.shared.config import get_settings
-from app.tools.delete_note import DeleteNoteError, delete_note, move_note_to_trash
-from app.tools.schemas import DeleteNoteFailure, DeleteNoteSuccess
+from app.tools.delete_note import DeleteNoteError, move_note_to_trash
 
 
 def test_move_note_to_trash__existing_note__moves_file_and_returns_relative_path(
@@ -157,54 +155,3 @@ def test_move_note_to_trash__rename_fails__raises_with_mapped_error_code(
 
     assert error.value.codes == [expected_code]
     assert (tmp_vault_path / path).exists()
-
-
-def test_delete_note__existing_note__returns_success_with_trash_path(
-    tmp_vault_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    path = "pages/kubernetes.md"
-    monkeypatch.setenv("KB_VAULT_PATH", str(tmp_vault_path))
-    monkeypatch.chdir(tmp_vault_path)
-    get_settings.cache_clear()
-
-    try:
-        result = delete_note(path)
-    finally:
-        get_settings.cache_clear()
-
-    assert result == DeleteNoteSuccess(
-        ok=True, path=path, trash_path="trash/kubernetes.md.trash"
-    )
-    assert not (tmp_vault_path / path).exists()
-
-
-@pytest.mark.parametrize(
-    "error_codes",
-    [
-        pytest.param(["note_not_found"], id="note_not_found"),
-        pytest.param(["invalid_path"], id="invalid_path"),
-        pytest.param(["permission_denied"], id="permission_denied"),
-        pytest.param(["file_operation_failed"], id="file_operation_failed"),
-    ],
-)
-def test_delete_note__expected_error__returns_failure_with_error_codes(
-    tmp_vault_path: Path, monkeypatch: pytest.MonkeyPatch, error_codes: list[str]
-):
-    def fail_move_note_to_trash(vault_path: Path, path: str) -> str:
-        raise DeleteNoteError(error_codes)
-
-    monkeypatch.setattr(
-        "app.tools.delete_note.move_note_to_trash", fail_move_note_to_trash
-    )
-    monkeypatch.setenv("KB_VAULT_PATH", str(tmp_vault_path))
-    monkeypatch.chdir(tmp_vault_path)
-    get_settings.cache_clear()
-
-    try:
-        result = delete_note("pages/kubernetes.md")
-    finally:
-        get_settings.cache_clear()
-
-    assert result == DeleteNoteFailure(
-        ok=False, path="pages/kubernetes.md", error=error_codes
-    )
