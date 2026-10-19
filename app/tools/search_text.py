@@ -47,6 +47,8 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
         return []
 
     for page in page_paths:
+        if page.is_symlink():
+            continue
         content = page.read_text()
         normalized_content = _normalize_page_content(content)
 
@@ -70,6 +72,7 @@ def find_hits(vault_path: Path, terms: list[str], limit: int) -> list[NoteHit]:
 def search_text(terms: list[str]) -> list[NoteHit]:
     """
     Busca texto en notas .md del vault y sus subcarpetas.
+    Ignora archivos y carpetas que sean enlaces simbólicos.
     Devuelve notas que contengan al menos uno de los términos.
 
     Args:
