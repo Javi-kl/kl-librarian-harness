@@ -1,3 +1,6 @@
+# Vault local para pruebas manuales
+/testVault/
+
 # FastAPI specific
 app.log
 .env
@@ -74,4 +77,3 @@ debug.log
 tmp_vault_sessions/
 # Agent tooling
 .atl/
-
