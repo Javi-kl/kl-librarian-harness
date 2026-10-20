@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -8,7 +9,11 @@ from pydantic import field_validator
 class Settings(BaseSettings):
     KB_VAULT_PATH: Path
 
-    model_config = SettingsConfigDict(env_file=".env", extra="forbid")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @field_validator("KB_VAULT_PATH")
     @classmethod
@@ -18,6 +23,17 @@ class Settings(BaseSettings):
         return value
 
 
+class DeepSeekSettings(BaseSettings):
+    DEEPSEEK_API_KEY: SecretStr
+    DEEPSEEK_MODEL: str
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    return Settings.model_validate({})
