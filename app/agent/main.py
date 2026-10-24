@@ -5,6 +5,7 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.usage import UsageLimits
 
+from app.guardrails.state import ConversationState
 from app.shared.config import DeepSeekSettings
 from app.agent.runtime import create_agent
 
@@ -24,6 +25,7 @@ def main() -> None:
     agent = create_agent(model)
     history: list[ModelMessage] = []
     logger.info("Asistente de KB. Escribe 'salir' para terminar.")
+    state = ConversationState()
     while True:
         try:
             user_message = input("\nTú> ").strip()
@@ -37,6 +39,7 @@ def main() -> None:
         result = agent.run_sync(
             user_message,
             message_history=history,
+            deps=state,
             usage_limits=UsageLimits(
                 request_limit=5,
                 tool_calls_limit=3,
