@@ -1,6 +1,6 @@
 import logging
 
-from pydantic_ai import ModelMessage, ToolCallPart
+from pydantic_ai import DeferredToolRequests, ModelMessage, ToolCallPart
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.usage import UsageLimits
@@ -47,6 +47,10 @@ def main() -> None:
         )
         history = result.all_messages()
         logger.info("Agente:\n%s", result.output)
+        if isinstance(result.output, DeferredToolRequests):
+            logger.info("Hay una edición pendiente; Todavía no se ejecutará.")
+            break
+
         for message in result.new_messages():
             for part in message.parts:
                 if isinstance(part, ToolCallPart):

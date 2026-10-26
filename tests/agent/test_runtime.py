@@ -1,5 +1,7 @@
 from pathlib import Path
 import pytest
+
+from pydantic_ai import DeferredToolRequests
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -18,7 +20,7 @@ from app.shared.config import get_settings
 from app.tools.schemas import NoteHit
 
 
-def test_create_agent__initial_configuration__exposes_only_search_text():
+def test_create_agent__initial_configuration__exposes_search_and_edit_tools():
     model = TestModel(call_tools=[])
     agent = create_agent(model)
 
@@ -29,7 +31,10 @@ def test_create_agent__initial_configuration__exposes_only_search_text():
 
     parameters = model.last_model_request_parameters
     assert parameters is not None
-    assert [tool.name for tool in parameters.function_tools] == ["search_text"]
+    assert [tool.name for tool in parameters.function_tools] == [
+        "search_text",
+        "edit_note",
+    ]
     tool = parameters.function_tools[0]
     assert set(tool.parameters_json_schema["properties"]) == {"terms"}
 
@@ -91,3 +96,57 @@ def test_create_agent__search_requested__returns_matching_note_to_model(
         get_settings.cache_clear()
 
     assert state.read_notes == {"ollama.md": note_content}
+
+
+def test_create_agent__edit_requested__defers_call_without_changing_note(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    vault_path = tmp_path / "vault"
+    vault_path.mkdir()
+    tmp_note = vault_path / "gardening.md"
+
+    content = b"cuidados del romero"
+    tmp_note.write_bytes(content)
+    monkeypatch.setenv("KB_VAULT_PATH", str(vault_path))
+    get_settings.cache_clear()
+
+    def simulated_model(
+        messages: list[ModelMessage],
+        info: AgentInfo,
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="edit_note",
+                    args={
+                        "path": "gardening.md",
+                        "content": "Contenido nuevo.",
+                    },
+                    tool_call_id="edit-1",
+                )
+            ]
+        )
+
+    agent = create_agent(FunctionModel(simulated_model))
+
+    try:
+        result = agent.run_sync(
+            "Cambia la nota de jardinería.",
+            deps=ConversationState(),
+            usage_limits=UsageLimits(request_limit=1),
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert isinstance(result.output, DeferredToolRequests)
+    assert len(result.output.approvals) == 1
+
+    pending_call = result.output.approvals[0]
+    assert pending_call.tool_name == "edit_note"
+    assert pending_call.tool_call_id == "edit-1"
+    assert pending_call.args_as_dict() == {
+        "path": "gardening.md",
+        "content": "Contenido nuevo.",
+    }
+    assert tmp_note.read_bytes() == content
