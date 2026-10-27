@@ -1,7 +1,9 @@
 from pathlib import Path
 from dataclasses import dataclass
+from difflib import unified_diff
 
 from app.guardrails.state import ConversationState
+from app.shared.note_paths import NotePathError, resolve_note_path
 
 
 class EditApprovalError(Exception):
@@ -28,10 +30,33 @@ def prepare_edit_for_approval(
         )
 
     previous_content = state.read_notes[path]
-    note_path = vault_path / path
-    current_content = note_path.read_text(encoding="utf-8")
+    try:
+        note_path = resolve_note_path(vault_path, path)
+    except NotePathError as error:
+        raise EditApprovalError(
+            f"No se puede preparar la edición de la nota: {error.code}."
+        ) from error
+
+    original_bytes = note_path.read_bytes()
+    original_content = original_bytes.decode("utf-8")
+    # La búsqueda usa read_text, que normaliza los saltos de línea.
+    current_content = original_content.replace("\r\n", "\n").replace("\r", "\n")
 
     if current_content != previous_content:
         raise EditApprovalError("La nota ha cambiado desde la ultima lectura.")
 
-    raise NotImplementedError
+    diff = "".join(
+        unified_diff(
+            original_content.splitlines(keepends=True),
+            content.splitlines(keepends=True),
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+        )
+    )
+
+    return EditProposal(
+        path=path,
+        original_bytes=original_bytes,
+        content=content,
+        diff=diff,
+    )
