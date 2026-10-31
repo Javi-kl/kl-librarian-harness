@@ -26,7 +26,7 @@ def prepare_edit_for_approval(
 ) -> EditProposal:
     if path not in state.read_notes:
         raise EditApprovalError(
-            "La nota no se ha devuleto al agente durante esta conversación."
+            "La nota no se ha devuelto al agente durante esta conversación."
         )
 
     previous_content = state.read_notes[path]
