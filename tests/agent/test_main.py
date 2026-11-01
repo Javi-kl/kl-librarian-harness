@@ -21,6 +21,9 @@ from app.shared.config import DeepSeekSettings, get_settings
 def test_main__two_user_turns__passes_previous_exchange_to_second_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Simula dos entradas por CLI y comprueba que la segunda petición al modelo
+    incluye la primera entrada, su respuesta y el nuevo mensaje."""
+
     requests: list[list[ModelMessage]] = []
 
     def simulated_model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
@@ -57,11 +60,13 @@ def test_main__two_user_turns__passes_previous_exchange_to_second_request(
     ]
 
 
-def test_main__edit_requested_after_search__shows_diff_without_changing_note(
+def test_main__edit_approved_after_search__shows_diff_and_writes_proposed_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Simula búsqueda, solicitud de edición y aceptación por CLI, usando las tools
+    reales sobre una nota temporal. Comprueba el diff mostrado y el contenido escrito."""
 
     note_path = tmp_path / "ollama.md"
     original_content = b"# Ollama\nEjecuta modelos localmente.\n"
@@ -75,6 +80,14 @@ def test_main__edit_requested_after_search__shows_diff_without_changing_note(
             isinstance(part, ToolReturnPart) and part.tool_name == "search_text"
             for part in latest_message.parts
         )
+
+        edit_completed = any(
+            isinstance(part, ToolReturnPart) and part.tool_name == "edit_note"
+            for part in latest_message.parts
+        )
+
+        if edit_completed:
+            return ModelResponse(parts=[TextPart("Edición terminada.")])
 
         if not search_completed:
             return ModelResponse(
@@ -110,7 +123,7 @@ def test_main__edit_requested_after_search__shows_diff_without_changing_note(
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
     get_settings.cache_clear()
 
-    inputs = iter(["Busca Ollama y propón una actualización.", "salir"])
+    inputs = iter(["Busca Ollama y propón una actualización.", "s", "salir"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
 
     caplog.set_level(logging.INFO, logger=cli.__name__)
@@ -122,4 +135,4 @@ def test_main__edit_requested_after_search__shows_diff_without_changing_note(
 
     assert "-Ejecuta modelos localmente.\n" in caplog.text
     assert "+Texto actualizado.\n" in caplog.text
-    assert note_path.read_bytes() == original_content
+    assert note_path.read_bytes() == b"# Ollama\nTexto actualizado.\n"

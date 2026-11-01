@@ -1,13 +1,23 @@
 import logging
 
-from pydantic_ai import DeferredToolRequests, ModelMessage, ToolCallPart
+from pydantic_ai import (
+    DeferredToolRequests,
+    DeferredToolResults,
+    ModelMessage,
+    ToolCallPart,
+)
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.usage import UsageLimits
 
-from app.guardrails.approval import EditApprovalError, prepare_edit_for_approval
+from app.guardrails.approval import (
+    EditProposal,
+    EditApprovalError,
+    prepare_edit_for_approval,
+)
 from app.guardrails.state import ConversationState
 from app.shared.config import DeepSeekSettings, get_settings
+from app.shared.note_paths import NotePathError, resolve_note_path
 from app.agent.runtime import create_agent
 
 logger = logging.getLogger(__name__)
@@ -49,8 +59,9 @@ def main() -> None:
         )
         history = result.all_messages()
 
-        if isinstance(result.output, DeferredToolRequests):
+        while isinstance(result.output, DeferredToolRequests):
             vault_path = get_settings().KB_VAULT_PATH
+            accepted_proposal: dict[str, EditProposal] = {}
 
             for call in result.output.approvals:
                 if call.tool_name != "edit_note":
@@ -58,7 +69,7 @@ def main() -> None:
                         "Solicitud pendiente no soportada: %s",
                         call.tool_name,
                     )
-                    continue
+                    return
 
                 args = call.args_as_dict()
 
@@ -75,18 +86,66 @@ def main() -> None:
                         args["path"],
                         error,
                     )
-                    continue
+                    return
                 if proposal.diff:
                     logger.info(
                         "Cambio propuesto en %s:\n%s",
                         proposal.path,
                         proposal.diff,
                     )
-                else:
-                    logger.info("Sin cambios en %s.", proposal.path)
+                    try:
+                        answer = input(
+                            f"Aplicar la edición de {proposal.path}? [s/N] "
+                        ).strip()
+                    except (EOFError, KeyboardInterrupt):
+                        logger.info(
+                            "Revisión cancelada. No se ha ejecutado ninguna edición."
+                        )
+                        return
+                    if answer.lower() != "s":
+                        logger.info(
+                            "Edición rechazada. No se ha ejecutado ninguna edición."
+                        )
+                        return
+                    accepted_proposal[call.tool_call_id] = proposal
 
-            logger.info("No se ha ejecutado ninguna edición.")
-            break
+                else:
+                    logger.info(
+                        "Sin cambios en %s. Se cancela esta revisión sin ejecutar ediciones.",
+                        proposal.path,
+                    )
+                    return
+
+            try:
+                for proposal in accepted_proposal.values():
+                    note_path = resolve_note_path(vault_path, proposal.path)
+
+                    if note_path.read_bytes() != proposal.original_bytes:
+                        logger.warning(
+                            "La nota %s cambió durante la revisión. No se ejecutarán las ediciones.",
+                            proposal.path,
+                        )
+                        return
+            except (NotePathError, OSError) as error:
+                logger.warning("No se pueden ejecutar las ediciones: %s", error)
+                return
+
+            approvals = DeferredToolResults(
+                approvals={call_id: True for call_id in accepted_proposal}
+            )
+
+            result = agent.run_sync(
+                message_history=history,
+                deps=state,
+                deferred_tool_results=approvals,
+                usage=result.usage,
+                usage_limits=UsageLimits(
+                    request_limit=5,
+                    tool_calls_limit=3,
+                ),
+            )
+
+            history = result.all_messages()
 
         logger.info("Agente:\n%s", result.output)
 
