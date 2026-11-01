@@ -21,6 +21,9 @@ from app.tools.schemas import NoteHit
 
 
 def test_create_agent__initial_configuration__exposes_search_and_edit_tools():
+    """Inspecciona las herramientas ofrecidas al modelo y comprueba que el contexto
+    interno de búsqueda no aparece entre los argumentos que puede proporcionar."""
+
     model = TestModel(call_tools=[])
     agent = create_agent(model)
 
@@ -43,6 +46,9 @@ def test_create_agent__search_requested__returns_matching_note_to_model(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    """Un modelo simulado solicita una búsqueda real y recibe la nota coincidente.
+    Comprueba que solo las notas devueltas quedan registradas como leídas."""
+
     note_content = "# Ollama\nEjecuta modelos localmente."
     (tmp_path / "ollama.md").write_text(note_content, encoding="utf-8")
 
@@ -102,6 +108,9 @@ def test_create_agent__edit_requested__defers_call_without_changing_note(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    """Un modelo simulado solicita editar una nota y el runtime devuelve la llamada
+    pendiente de aprobación, con sus argumentos, sin modificar el archivo."""
+
     vault_path = tmp_path / "vault"
     vault_path.mkdir()
     tmp_note = vault_path / "gardening.md"
