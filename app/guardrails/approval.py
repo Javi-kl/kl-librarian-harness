@@ -6,8 +6,8 @@ from app.guardrails.state import ConversationState
 from app.shared.note_paths import NotePathError, resolve_note_path
 
 
-class EditApprovalError(Exception):
-    """Indica que una edición no puede prepararse para aprobación."""
+class MutationApprovalError(Exception):
+    """Indica que una modificación no puede prepararse para aprobación."""
 
 
 @dataclass(frozen=True)
@@ -18,14 +18,20 @@ class EditProposal:
     diff: str
 
 
-def prepare_edit_for_approval(
+@dataclass(frozen=True)
+class DeleteProposal:
+    path: str
+    original_bytes: bytes
+
+
+def _read_note_for_approval(
     vault_path: Path,
     state: ConversationState,
     path: str,
-    content: str,
-) -> EditProposal:
+) -> bytes:
+
     if path not in state.read_notes:
-        raise EditApprovalError(
+        raise MutationApprovalError(
             "La nota no se ha devuelto al agente durante esta conversación."
         )
 
@@ -33,8 +39,8 @@ def prepare_edit_for_approval(
     try:
         note_path = resolve_note_path(vault_path, path)
     except NotePathError as error:
-        raise EditApprovalError(
-            f"No se puede preparar la edición de la nota: {error.code}."
+        raise MutationApprovalError(
+            f"No se puede preparar la operación sobre la nota: {error.code}."
         ) from error
 
     original_bytes = note_path.read_bytes()
@@ -43,7 +49,20 @@ def prepare_edit_for_approval(
     current_content = original_content.replace("\r\n", "\n").replace("\r", "\n")
 
     if current_content != previous_content:
-        raise EditApprovalError("La nota ha cambiado desde la ultima lectura.")
+        raise MutationApprovalError("La nota ha cambiado desde la ultima lectura.")
+
+    return original_bytes
+
+
+def prepare_edit_for_approval(
+    vault_path: Path,
+    state: ConversationState,
+    path: str,
+    content: str,
+) -> EditProposal:
+
+    original_bytes = _read_note_for_approval(vault_path, state, path)
+    original_content = original_bytes.decode("utf-8")
 
     diff = "".join(
         unified_diff(
@@ -59,4 +78,17 @@ def prepare_edit_for_approval(
         original_bytes=original_bytes,
         content=content,
         diff=diff,
+    )
+
+
+def prepare_delete_for_approval(
+    vault_path: Path,
+    state: ConversationState,
+    path: str,
+) -> DeleteProposal:
+
+    original_bytes = _read_note_for_approval(vault_path, state, path)
+    return DeleteProposal(
+        path=path,
+        original_bytes=original_bytes,
     )

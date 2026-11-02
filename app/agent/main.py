@@ -11,8 +11,10 @@ from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.usage import UsageLimits
 
 from app.guardrails.approval import (
+    DeleteProposal,
     EditProposal,
-    EditApprovalError,
+    MutationApprovalError,
+    prepare_delete_for_approval,
     prepare_edit_for_approval,
 )
 from app.guardrails.state import ConversationState
@@ -61,10 +63,10 @@ def main() -> None:
 
         while isinstance(result.output, DeferredToolRequests):
             vault_path = get_settings().KB_VAULT_PATH
-            accepted_proposal: dict[str, EditProposal] = {}
+            accepted_proposal: dict[str, EditProposal | DeleteProposal] = {}
 
             for call in result.output.approvals:
-                if call.tool_name != "edit_note":
+                if call.tool_name not in {"edit_note", "delete_note"}:
                     logger.warning(
                         "Solicitud pendiente no soportada: %s",
                         call.tool_name,
@@ -74,47 +76,62 @@ def main() -> None:
                 args = call.args_as_dict()
 
                 try:
-                    proposal = prepare_edit_for_approval(
-                        vault_path=vault_path,
-                        state=state,
-                        path=args["path"],
-                        content=args["content"],
-                    )
-                except (EditApprovalError, OSError, UnicodeError) as error:
+                    proposal: EditProposal | DeleteProposal
+                    if call.tool_name == "edit_note":
+                        proposal = prepare_edit_for_approval(
+                            vault_path=vault_path,
+                            state=state,
+                            path=args["path"],
+                            content=args["content"],
+                        )
+                    else:
+                        proposal = prepare_delete_for_approval(
+                            vault_path=vault_path,
+                            state=state,
+                            path=args["path"],
+                        )
+
+                except (MutationApprovalError, OSError, UnicodeError) as error:
                     logger.warning(
-                        "No se puede preparar la edición de %s: %s",
+                        "No se puede preparar la operación de %s: %s",
                         args["path"],
                         error,
                     )
                     return
-                if proposal.diff:
+
+                if isinstance(proposal, EditProposal):
+                    if not proposal.diff:
+                        logger.info(
+                            "Sin cambios en %s. Se cancela la revisión.", proposal.path
+                        )
+                        return
+
                     logger.info(
                         "Cambio propuesto en %s:\n%s",
                         proposal.path,
                         proposal.diff,
                     )
-                    try:
-                        answer = input(
-                            f"Aplicar la edición de {proposal.path}? [s/N] "
-                        ).strip()
-                    except (EOFError, KeyboardInterrupt):
-                        logger.info(
-                            "Revisión cancelada. No se ha ejecutado ninguna edición."
-                        )
-                        return
-                    if answer.lower() != "s":
-                        logger.info(
-                            "Edición rechazada. No se ha ejecutado ninguna edición."
-                        )
-                        return
-                    accepted_proposal[call.tool_call_id] = proposal
-
+                    question = f"¿Aplicar la edición de {proposal.path}? [s/N] "
                 else:
                     logger.info(
-                        "Sin cambios en %s. Se cancela esta revisión sin ejecutar ediciones.",
+                        "Borrado propuesto: mover %s a la papelera del vault.",
                         proposal.path,
                     )
+                    question = f"¿Mover {proposal.path} a la papelera? [s/N] "
+
+                try:
+                    answer = input(question).strip()
+                except (EOFError, KeyboardInterrupt):
+                    logger.info(
+                        "Revisión cancelada. No se ha ejecutado ninguna operación."
+                    )
                     return
+                if answer.lower() != "s":
+                    logger.info(
+                        "Operación rechazada. No se ha ejecutado ninguna operación."
+                    )
+                    return
+                accepted_proposal[call.tool_call_id] = proposal
 
             try:
                 for proposal in accepted_proposal.values():
@@ -122,12 +139,12 @@ def main() -> None:
 
                     if note_path.read_bytes() != proposal.original_bytes:
                         logger.warning(
-                            "La nota %s cambió durante la revisión. No se ejecutarán las ediciones.",
+                            "La nota %s cambió durante la revisión. No se ejecutarán las operaciones.",
                             proposal.path,
                         )
                         return
             except (NotePathError, OSError) as error:
-                logger.warning("No se pueden ejecutar las ediciones: %s", error)
+                logger.warning("No se pueden ejecutar las operaciones: %s", error)
                 return
 
             approvals = DeferredToolResults(
