@@ -2,7 +2,7 @@ from pydantic_ai import Agent, DeferredToolRequests, Tool
 from pydantic_ai.models import Model
 
 from app.guardrails.state import ConversationState
-from app.tools.public_tools import search_text, edit_note
+from app.tools.public_tools import delete_note, search_text, edit_note
 
 
 def create_agent(
@@ -13,6 +13,7 @@ def create_agent(
         tools=[
             search_text,
             Tool(edit_note, requires_approval=True),
+            Tool(delete_note, requires_approval=True),
         ],
         deps_type=ConversationState,
         output_type=[str, DeferredToolRequests],

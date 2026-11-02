@@ -20,7 +20,7 @@ from app.shared.config import get_settings
 from app.tools.schemas import NoteHit
 
 
-def test_create_agent__initial_configuration__exposes_search_and_edit_tools():
+def test_create_agent__initial_configuration__exposes_management_tools():
     """Inspecciona las herramientas ofrecidas al modelo y comprueba que el contexto
     interno de búsqueda no aparece entre los argumentos que puede proporcionar."""
 
@@ -37,6 +37,7 @@ def test_create_agent__initial_configuration__exposes_search_and_edit_tools():
     assert [tool.name for tool in parameters.function_tools] == [
         "search_text",
         "edit_note",
+        "delete_note",
     ]
     tool = parameters.function_tools[0]
     assert set(tool.parameters_json_schema["properties"]) == {"terms"}
@@ -104,12 +105,29 @@ def test_create_agent__search_requested__returns_matching_note_to_model(
     assert state.read_notes == {"ollama.md": note_content}
 
 
-def test_create_agent__edit_requested__defers_call_without_changing_note(
+@pytest.mark.parametrize(
+    ("tool_name", "args"),
+    [
+        pytest.param(
+            "edit_note",
+            {"path": "gardening.md", "content": "Contenido nuevo."},
+            id="edit",
+        ),
+        pytest.param(
+            "delete_note",
+            {"path": "gardening.md"},
+            id="delete",
+        ),
+    ],
+)
+def test_create_agent__mutation_requested__defers_call_without_changing_note(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    tool_name: str,
+    args: dict[str, str],
 ):
-    """Un modelo simulado solicita editar una nota y el runtime devuelve la llamada
-    pendiente de aprobación, con sus argumentos, sin modificar el archivo."""
+    """Simula una solicitud de edición o borrado y comprueba que queda pendiente
+    de aprobación, conservando los argumentos y la nota original."""
 
     vault_path = tmp_path / "vault"
     vault_path.mkdir()
@@ -127,12 +145,9 @@ def test_create_agent__edit_requested__defers_call_without_changing_note(
         return ModelResponse(
             parts=[
                 ToolCallPart(
-                    tool_name="edit_note",
-                    args={
-                        "path": "gardening.md",
-                        "content": "Contenido nuevo.",
-                    },
-                    tool_call_id="edit-1",
+                    tool_name=tool_name,
+                    args=args,
+                    tool_call_id="mutation-1",
                 )
             ]
         )
@@ -152,10 +167,7 @@ def test_create_agent__edit_requested__defers_call_without_changing_note(
     assert len(result.output.approvals) == 1
 
     pending_call = result.output.approvals[0]
-    assert pending_call.tool_name == "edit_note"
-    assert pending_call.tool_call_id == "edit-1"
-    assert pending_call.args_as_dict() == {
-        "path": "gardening.md",
-        "content": "Contenido nuevo.",
-    }
+    assert pending_call.tool_name == tool_name
+    assert pending_call.tool_call_id == "mutation-1"
+    assert pending_call.args_as_dict() == args
     assert tmp_note.read_bytes() == content
