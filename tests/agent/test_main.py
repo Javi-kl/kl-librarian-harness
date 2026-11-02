@@ -60,13 +60,32 @@ def test_main__two_user_turns__passes_previous_exchange_to_second_request(
     ]
 
 
-def test_main__edit_approved_after_search__shows_diff_and_writes_proposed_content(
+@pytest.mark.parametrize(
+    ("answer", "external_content", "expected_content"),
+    [
+        pytest.param("s", None, b"# Ollama\nTexto actualizado.\n", id="approved"),
+        pytest.param(
+            "n", None, b"# Ollama\nEjecuta modelos localmente.\n", id="rejected"
+        ),
+        pytest.param(
+            "s",
+            b"# Ollama\nCambio manual del usuario.\n",
+            b"# Ollama\nCambio manual del usuario.\n",
+            id="changed_during_confirmation",
+        ),
+    ],
+)
+def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    answer: str,
+    external_content: bytes | None,
+    expected_content: bytes,
 ) -> None:
-    """Simula búsqueda, solicitud de edición y aceptación por CLI, usando las tools
-    reales sobre una nota temporal. Comprueba el diff mostrado y el contenido escrito."""
+    """Simula búsqueda y revisión de una edición por CLI sobre una nota temporal.
+    Comprueba el diff, la aceptación y el rechazo; si la nota cambia durante la
+    confirmación, conserva ese cambio aunque el usuario acepte la propuesta antigua."""
 
     note_path = tmp_path / "ollama.md"
     original_content = b"# Ollama\nEjecuta modelos localmente.\n"
@@ -123,8 +142,15 @@ def test_main__edit_approved_after_search__shows_diff_and_writes_proposed_conten
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
     get_settings.cache_clear()
 
-    inputs = iter(["Busca Ollama y propón una actualización.", "s", "salir"])
-    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    inputs = iter(["Busca Ollama y propón una actualización.", answer, "salir"])
+
+    def simulated_input(prompt: str) -> str:
+        response = next(inputs)
+        if response == "s" and external_content is not None:
+            note_path.write_bytes(external_content)
+        return response
+
+    monkeypatch.setattr("builtins.input", simulated_input)
 
     caplog.set_level(logging.INFO, logger=cli.__name__)
 
@@ -135,4 +161,4 @@ def test_main__edit_approved_after_search__shows_diff_and_writes_proposed_conten
 
     assert "-Ejecuta modelos localmente.\n" in caplog.text
     assert "+Texto actualizado.\n" in caplog.text
-    assert note_path.read_bytes() == b"# Ollama\nTexto actualizado.\n"
+    assert note_path.read_bytes() == expected_content
