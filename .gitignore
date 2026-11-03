@@ -1,6 +1,9 @@
 # Vault local para pruebas manuales
 /testVault/
 
+#Traza local de operaciones.
+/operations.jsonl
+
 # FastAPI specific
 app.log
 .env
