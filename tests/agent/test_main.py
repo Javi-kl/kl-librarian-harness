@@ -162,3 +162,74 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
     assert "-Ejecuta modelos localmente.\n" in caplog.text
     assert "+Texto actualizado.\n" in caplog.text
     assert note_path.read_bytes() == expected_content
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected_path", "absent_path"),
+    [
+        pytest.param("s", "trash/ollama.md.trash", "ollama.md", id="approved"),
+        pytest.param("n", "ollama.md", "trash/ollama.md.trash", id="rejected"),
+    ],
+)
+def test_main__delete_reviewed_after_search__respects_decision_and_preserves_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    answer: str,
+    expected_path: str,
+    absent_path: str,
+) -> None:
+    """Simula búsqueda y revisión de un borrado por CLI.
+    Aceptar mueve la nota a la papelera; rechazar la conserva en su ubicación,
+    manteniendo en ambos casos sus bytes originales."""
+
+    original_content = b"# Ollama\nEjecuta modelos localmente.\n"
+    (tmp_path / "ollama.md").write_bytes(original_content)
+
+    def simulated_model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        latest_message = messages[-1]
+        assert isinstance(latest_message, ModelRequest)
+        completed_tools = {
+            part.tool_name
+            for part in latest_message.parts
+            if isinstance(part, ToolReturnPart)
+        }
+        if "delete_note" in completed_tools:
+            return ModelResponse(parts=[TextPart("Operación terminada.")])
+        if "search_text" in completed_tools:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="delete_note",
+                        args={"path": "ollama.md"},
+                        tool_call_id="delete-1",
+                    )
+                ]
+            )
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="search_text",
+                    args={"terms": ["ollama"]},
+                    tool_call_id="search-1",
+                )
+            ]
+        )
+
+    settings = DeepSeekSettings.model_construct(
+        DEEPSEEK_API_KEY=SecretStr("test-key"), DEEPSEEK_MODEL="test"
+    )
+    monkeypatch.setattr(cli.DeepSeekSettings, "model_validate", lambda data: settings)
+    monkeypatch.setattr(
+        cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
+    )
+    monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
+    get_settings.cache_clear()
+    inputs = iter(["Busca la nota de Ollama y bórrala.", answer, "salir"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+
+    try:
+        cli.main()
+    finally:
+        get_settings.cache_clear()
+    assert (tmp_path / expected_path).read_bytes() == original_content
+    assert not (tmp_path / absent_path).exists()
