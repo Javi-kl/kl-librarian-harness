@@ -5,9 +5,14 @@
 >Kl Librarian — agent harness que gestiona una base de conocimiento .md:
 la mantiene sana e integra contenido nuevo, con aprobación y trazabilidad.
 
+## Ejecución
+
+Desde la raíz del proyecto, con el entorno existente y la configuración en `.env`:
+
+```bash
+.venv/bin/python -m app.main
+```
+
 ## Estructura del proyecto
 
 Arquitectura: monolito modular
-
-
-  

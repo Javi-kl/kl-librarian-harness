@@ -3,7 +3,6 @@ import logging
 import json
 
 from pathlib import Path
-from pydantic import SecretStr
 from pydantic_ai.messages import (
     ModelRequest,
     ToolCallPart,
@@ -15,11 +14,12 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from app.agent import main as cli
-from app.shared.config import DeepSeekSettings, get_settings
+from app.agent.runtime import create_agent
+from app.cli import chat as cli
+from app.shared.config import get_settings
 
 
-def test_main__two_user_turns__passes_previous_exchange_to_second_request(
+def test_run_chat__two_user_turns__passes_previous_exchange_to_second_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Simula dos entradas por CLI y comprueba que la segunda petición al modelo
@@ -31,17 +31,11 @@ def test_main__two_user_turns__passes_previous_exchange_to_second_request(
         requests.append(list(messages))
         return ModelResponse(parts=[TextPart("Respuesta simulada.")])
 
-    settings = DeepSeekSettings.model_construct(
-        DEEPSEEK_API_KEY=SecretStr("test-key"), DEEPSEEK_MODEL="test"
-    )
-    monkeypatch.setattr(cli.DeepSeekSettings, "model_validate", lambda data: settings)
-    monkeypatch.setattr(
-        cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
-    )
+    agent = create_agent(FunctionModel(simulated_model))
     inputs = iter(["Busca notas sobre Ollama.", "Explícame el resultado.", "salir"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
 
-    cli.main()
+    cli.run_chat(agent)
 
     assert len(requests) == 2
     conversation_parts = [part for message in requests[1] for part in message.parts]
@@ -86,7 +80,7 @@ def test_main__two_user_turns__passes_previous_exchange_to_second_request(
         ),
     ],
 )
-def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
+def test_run_chat__edit_reviewed_after_search__shows_diff_and_respects_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
@@ -145,13 +139,7 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
             ]
         )
 
-    settings = DeepSeekSettings.model_construct(
-        DEEPSEEK_API_KEY=SecretStr("test-key"), DEEPSEEK_MODEL="test"
-    )
-    monkeypatch.setattr(cli.DeepSeekSettings, "model_validate", lambda data: settings)
-    monkeypatch.setattr(
-        cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
-    )
+    agent = create_agent(FunctionModel(simulated_model))
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
     trace_path = tmp_path if trace_unavailable else tmp_path / "operations.jsonl"
     monkeypatch.setenv("TRACE_PATH", str(trace_path))
@@ -167,10 +155,10 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
 
     monkeypatch.setattr("builtins.input", simulated_input)
 
-    caplog.set_level(logging.INFO, logger=cli.__name__)
+    caplog.set_level(logging.INFO, logger="app.cli")
 
     try:
-        cli.main()
+        cli.run_chat(agent)
     finally:
         get_settings.cache_clear()
 
@@ -200,7 +188,7 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
         pytest.param("n", "ollama.md", "trash/ollama.md.trash", id="rejected"),
     ],
 )
-def test_main__delete_reviewed_after_search__respects_decision_and_preserves_content(
+def test_run_chat__delete_reviewed_after_search__respects_decision_and_preserves_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     answer: str,
@@ -244,13 +232,7 @@ def test_main__delete_reviewed_after_search__respects_decision_and_preserves_con
             ]
         )
 
-    settings = DeepSeekSettings.model_construct(
-        DEEPSEEK_API_KEY=SecretStr("test-key"), DEEPSEEK_MODEL="test"
-    )
-    monkeypatch.setattr(cli.DeepSeekSettings, "model_validate", lambda data: settings)
-    monkeypatch.setattr(
-        cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
-    )
+    agent = create_agent(FunctionModel(simulated_model))
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
     trace_path = tmp_path / "operations.jsonl"
     monkeypatch.setenv("TRACE_PATH", str(trace_path))
@@ -259,7 +241,7 @@ def test_main__delete_reviewed_after_search__respects_decision_and_preserves_con
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
 
     try:
-        cli.main()
+        cli.run_chat(agent)
     finally:
         get_settings.cache_clear()
     assert (tmp_path / expected_path).read_bytes() == original_content
