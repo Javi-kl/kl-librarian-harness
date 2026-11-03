@@ -17,6 +17,9 @@ from app.tools.schemas import (
 def test_edit_note__existing_note__returns_verified_success(
     tmp_vault_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    """Ejecuta la tool pública sobre un vault temporal y comprueba la respuesta
+    de éxito y la escritura exacta de UTF-8 y saltos de línea."""
+
     path = "pages/kubernetes.md"
     content = "# Edición\r\nPrimera línea con café.\nÚltima línea: niño."
     expected_content = content.encode("utf-8")
@@ -79,6 +82,9 @@ def test_edit_note__expected_error__returns_failure_with_error_codes(
 def test_delete_note__existing_note__returns_success_with_trash_path(
     tmp_vault_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    """Ejecuta la tool pública sobre un vault temporal y comprueba que devuelve
+    la ruta de papelera y que la nota deja de estar en su ubicación original."""
+
     path = "pages/kubernetes.md"
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_vault_path))
     monkeypatch.chdir(tmp_vault_path)

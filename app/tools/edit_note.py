@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from app.shared.note_paths import NotePathError, resolve_note_path
+
 
 class EditNoteError(Exception):
     """Comunica los fallos previstos de una edicion, en orden de prioridad."""
@@ -31,33 +33,12 @@ def _cleanup_temporary(
             raise EditNoteError(["temporary_cleanup_failed"]) from cleanup_error
 
 
-def _resolve_note_path(vault_path: Path, path: str) -> Path:
-    """Valida las restricciones de la ruta y devuelve el destino de la nota."""
-    relative_path = Path(path)
-    if relative_path.is_absolute():
-        raise EditNoteError(["invalid_path"])
-    if ".." in relative_path.parts:
-        raise EditNoteError(["invalid_path"])
-
-    note_path = vault_path.resolve()
-    for part in relative_path.parts:
-        note_path = note_path / part
-        if note_path.is_symlink():
-            raise EditNoteError(["invalid_path"])
-
-    if not note_path.exists():
-        raise EditNoteError(["note_not_found"])
-    if not note_path.is_file() or note_path.suffix != ".md":
-        raise EditNoteError(["invalid_path"])
-    return note_path
-
-
 def replace_note_content(vault_path: Path, path: str, content: str) -> int:
     """Reemplaza una nota y devuelve el tamaño verificado; señala fallos con EditNoteError."""
     expected_content = content.encode("utf-8")
     temporary_path: Path | None = None
     try:
-        note_path = _resolve_note_path(vault_path, path)
+        note_path = resolve_note_path(vault_path, path)
         with NamedTemporaryFile(
             dir=note_path.parent, suffix=".tmp", delete=False
         ) as temporary_file:
@@ -78,6 +59,8 @@ def replace_note_content(vault_path: Path, path: str, content: str) -> int:
         if final_content != expected_content:
             raise EditNoteError(["final_verification_failed"])
         return len(final_content)
+    except NotePathError as error:
+        raise EditNoteError([error.code]) from error
     except PermissionError as error:
         raise EditNoteError(["permission_denied"]) from error
     except OSError as error:

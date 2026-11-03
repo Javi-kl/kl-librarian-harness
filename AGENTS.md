@@ -40,7 +40,8 @@ Ejecutar los checks que apliquen al cambio y reportar el resultado. Si algo fall
 - Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_notes_with_hits__returns_top_15_sorted_by_hits`.
 - Deterministas: sin llamadas reales a APIs de modelos.
 - Bug: primero el test que lo reproduce, después el arreglo.
-- Priorizar tests esenciales, claros y fáciles de revisar: cada caso debe proteger un comportamiento relevante, no aumentar cobertura por sí sola. Evitar matrices de casos, fixtures o abstracciones innecesarias; explicar qué protege cada test propuesto antes de añadirlo.
+- Priorizar tests esenciales, claros y fáciles de revisar: cada caso debe proteger una política importante, una capacidad que se está incorporando o un bug real, no aumentar cobertura por sí sola. Explicar qué protege cada test propuesto antes de añadirlo.
+- Cada test tiene coste de lectura, comprensión y mantenimiento: imaginar un fallo no basta para justificar un caso separado. Evitar matrices de casos, fixtures o abstracciones innecesarias. TDD debe ayudar a avanzar en el producto, no obligar a recorrer todas las excepciones posibles.
 
 ## Flujo y permisos (estrictos)
 - Sin permiso explícito no se modifica ni se crea nada: primero explicar y proponer.

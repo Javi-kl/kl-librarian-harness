@@ -1,3 +1,5 @@
+from pydantic_ai import RunContext
+
 from app.shared.config import get_settings
 from app.tools.delete_note import DeleteNoteError, move_note_to_trash
 from app.tools.edit_note import EditNoteError, replace_note_content
@@ -8,10 +10,11 @@ from app.tools.schemas import (
     EditNoteSuccess,
     NoteHit,
 )
+from app.guardrails.state import ConversationState
 from app.tools.search_text import MAX_NOTES_LENGTH, find_hits
 
 
-def search_text(terms: list[str]) -> list[NoteHit]:
+def search_text(ctx: RunContext[ConversationState], terms: list[str]) -> list[NoteHit]:
     """
     Busca texto en notas .md del vault y sus subcarpetas.
     Ignora archivos y carpetas que sean enlaces simbólicos.
@@ -31,7 +34,11 @@ def search_text(terms: list[str]) -> list[NoteHit]:
             content: texto completo sin normalizar;
             hits: suma de apariciones de los términos normalizados distintos.
     """
-    return find_hits(get_settings().KB_VAULT_PATH, terms, MAX_NOTES_LENGTH)
+    notes = find_hits(get_settings().KB_VAULT_PATH, terms, MAX_NOTES_LENGTH)
+    for note in notes:
+        ctx.deps.read_notes[note.path] = note.content
+
+    return notes
 
 
 def edit_note(path: str, content: str) -> EditNoteSuccess | EditNoteFailure:
