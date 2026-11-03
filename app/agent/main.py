@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 from pydantic_ai import (
     DeferredToolRequests,
@@ -18,6 +19,7 @@ from app.guardrails.approval import (
     prepare_edit_for_approval,
 )
 from app.guardrails.state import ConversationState
+from app.observability.trace import record_decision
 from app.shared.config import DeepSeekSettings, get_settings
 from app.shared.note_paths import NotePathError, resolve_note_path
 from app.agent.runtime import create_agent
@@ -40,6 +42,7 @@ def main() -> None:
     history: list[ModelMessage] = []
     logger.info("Asistente de KB. Escribe 'salir' para terminar.")
     state = ConversationState()
+    conversation_id = str(uuid4())
     while True:
         try:
             user_message = input("\nTú> ").strip()
@@ -53,6 +56,7 @@ def main() -> None:
         result = agent.run_sync(
             user_message,
             message_history=history,
+            conversation_id=conversation_id,
             deps=state,
             usage_limits=UsageLimits(
                 request_limit=5,
@@ -62,7 +66,8 @@ def main() -> None:
         history = result.all_messages()
 
         while isinstance(result.output, DeferredToolRequests):
-            vault_path = get_settings().KB_VAULT_PATH
+            config = get_settings()
+            vault_path = config.KB_VAULT_PATH
             accepted_proposal: dict[str, EditProposal | DeleteProposal] = {}
 
             for call in result.output.approvals:
@@ -122,11 +127,33 @@ def main() -> None:
                 try:
                     answer = input(question).strip()
                 except (EOFError, KeyboardInterrupt):
+                    decision = "cancelled"
+                else:
+                    decision = "approved" if answer.lower() == "s" else "rejected"
+
+                try:
+                    record_decision(
+                        config.TRACE_PATH,
+                        conversation_id=conversation_id,
+                        call_id=call.tool_call_id,
+                        tool_name=call.tool_name,
+                        note_path=proposal.path,
+                        decision=decision,
+                    )
+                except (OSError, UnicodeError) as error:
+                    logger.error(
+                        "No se pudo registrar la decisión. "
+                        "No se ha ejecutado ninguna operación pendiente: %s",
+                        error,
+                    )
+                    return
+
+                if decision == "cancelled":
                     logger.info(
                         "Revisión cancelada. No se ha ejecutado ninguna operación."
                     )
                     return
-                if answer.lower() != "s":
+                if decision == "rejected":
                     logger.info(
                         "Operación rechazada. No se ha ejecutado ninguna operación."
                     )
@@ -153,6 +180,7 @@ def main() -> None:
 
             result = agent.run_sync(
                 message_history=history,
+                conversation_id=conversation_id,
                 deps=state,
                 deferred_tool_results=approvals,
                 usage=result.usage,

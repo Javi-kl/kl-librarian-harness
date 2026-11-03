@@ -8,6 +8,7 @@ from pydantic import field_validator
 
 class Settings(BaseSettings):
     KB_VAULT_PATH: Path
+    TRACE_PATH: Path = Path("operations.jsonl")
 
     model_config = SettingsConfigDict(
         env_file=".env",

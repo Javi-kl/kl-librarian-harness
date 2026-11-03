@@ -1,5 +1,6 @@
 import pytest
 import logging
+import json
 
 from pathlib import Path
 from pydantic import SecretStr
@@ -61,17 +62,27 @@ def test_main__two_user_turns__passes_previous_exchange_to_second_request(
 
 
 @pytest.mark.parametrize(
-    ("answer", "external_content", "expected_content"),
+    ("answer", "external_content", "trace_unavailable", "expected_content"),
     [
-        pytest.param("s", None, b"# Ollama\nTexto actualizado.\n", id="approved"),
         pytest.param(
-            "n", None, b"# Ollama\nEjecuta modelos localmente.\n", id="rejected"
+            "s", None, False, b"# Ollama\nTexto actualizado.\n", id="approved"
+        ),
+        pytest.param(
+            "n", None, False, b"# Ollama\nEjecuta modelos localmente.\n", id="rejected"
         ),
         pytest.param(
             "s",
             b"# Ollama\nCambio manual del usuario.\n",
+            False,
             b"# Ollama\nCambio manual del usuario.\n",
             id="changed_during_confirmation",
+        ),
+        pytest.param(
+            "s",
+            None,
+            True,
+            b"# Ollama\nEjecuta modelos localmente.\n",
+            id="trace_unavailable",
         ),
     ],
 )
@@ -81,11 +92,13 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
     caplog: pytest.LogCaptureFixture,
     answer: str,
     external_content: bytes | None,
+    trace_unavailable: bool,
     expected_content: bytes,
 ) -> None:
     """Simula búsqueda y revisión de una edición por CLI sobre una nota temporal.
     Comprueba el diff, la aceptación y el rechazo; si la nota cambia durante la
-    confirmación, conserva ese cambio aunque el usuario acepte la propuesta antigua."""
+    confirmación, conserva ese cambio aunque el usuario acepte la propuesta antigua.
+    Registra la decisión y no escribe la nota si falla el registro."""
 
     note_path = tmp_path / "ollama.md"
     original_content = b"# Ollama\nEjecuta modelos localmente.\n"
@@ -140,6 +153,8 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
         cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
     )
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
+    trace_path = tmp_path if trace_unavailable else tmp_path / "operations.jsonl"
+    monkeypatch.setenv("TRACE_PATH", str(trace_path))
     get_settings.cache_clear()
 
     inputs = iter(["Busca Ollama y propón una actualización.", answer, "salir"])
@@ -162,6 +177,20 @@ def test_main__edit_reviewed_after_search__shows_diff_and_respects_decision(
     assert "-Ejecuta modelos localmente.\n" in caplog.text
     assert "+Texto actualizado.\n" in caplog.text
     assert note_path.read_bytes() == expected_content
+    if not trace_unavailable:
+        events = [
+            json.loads(line)
+            for line in trace_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert len(events) == 1
+        event = events[0]
+        assert event["event"] == "decision"
+        assert event["call_id"] == "edit-1"
+        assert event["tool"] == "edit_note"
+        assert event["path"] == "ollama.md"
+        assert event["decision"] == ("approved" if answer == "s" else "rejected")
+        assert event["timestamp"]
+        assert event["conversation_id"]
 
 
 @pytest.mark.parametrize(
@@ -223,6 +252,8 @@ def test_main__delete_reviewed_after_search__respects_decision_and_preserves_con
         cli, "OpenAIChatModel", lambda *args, **kwargs: FunctionModel(simulated_model)
     )
     monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
+    trace_path = tmp_path / "operations.jsonl"
+    monkeypatch.setenv("TRACE_PATH", str(trace_path))
     get_settings.cache_clear()
     inputs = iter(["Busca la nota de Ollama y bórrala.", answer, "salir"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
@@ -233,3 +264,13 @@ def test_main__delete_reviewed_after_search__respects_decision_and_preserves_con
         get_settings.cache_clear()
     assert (tmp_path / expected_path).read_bytes() == original_content
     assert not (tmp_path / absent_path).exists()
+    events = [
+        json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(events) == 1
+    event = events[0]
+    assert event["event"] == "decision"
+    assert event["call_id"] == "delete-1"
+    assert event["tool"] == "delete_note"
+    assert event["path"] == "ollama.md"
+    assert event["decision"] == ("approved" if answer == "s" else "rejected")
