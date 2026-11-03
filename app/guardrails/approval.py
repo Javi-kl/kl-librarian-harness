@@ -1,13 +1,14 @@
 from pathlib import Path
 from dataclasses import dataclass
 from difflib import unified_diff
+from collections.abc import Iterable
 
 from app.guardrails.state import ConversationState
 from app.shared.note_paths import NotePathError, resolve_note_path
 
 
 class MutationApprovalError(Exception):
-    """Indica que una modificación no puede prepararse para aprobación."""
+    """Indica que una modificación no puede prepararse o validarse para ejecución."""
 
 
 @dataclass(frozen=True)
@@ -92,3 +93,23 @@ def prepare_delete_for_approval(
         path=path,
         original_bytes=original_bytes,
     )
+
+
+def validate_proposals_unchanged(
+    vault_path: Path,
+    proposals: Iterable[EditProposal | DeleteProposal],
+) -> None:
+    """Comprueba las rutas y versiones aprobadas; rechaza cambios antes de ejecutar."""
+    for proposal in proposals:
+        try:
+            note_path = resolve_note_path(vault_path, proposal.path)
+        except NotePathError as error:
+            raise MutationApprovalError(
+                f"La ruta de la nota {proposal.path} ya no es válida: {error.code}."
+            ) from error
+
+        if note_path.read_bytes() != proposal.original_bytes:
+            raise MutationApprovalError(
+                f"La nota {proposal.path} cambió durante la revisión. "
+                "No se ejecutarán las operaciones."
+            )
