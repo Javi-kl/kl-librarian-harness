@@ -25,7 +25,7 @@ Ejecutar los checks que apliquen al cambio y reportar el resultado. Si algo fall
 
 ## Estructura
 - Código en `app/`, por capas del mapa (`docs/architecture.md`): acciones · guardrails · herramientas · runtime + transversales (contexto, sesión, observabilidad, evals). Nombres de carpetas pendientes de fijar: no crear carpetas nuevas sin acordarlo.
-- Tests en `tests/`, espejando `app/`.
+- Tests por capa en `tests/`, espejando `app/`; recorridos que integran varias capas en `tests/integration/`.
 
 ## Código
 - Python 3.14 · pydantic-ai v2 (no v1: los ejemplos de internet usan otros nombres).
@@ -36,9 +36,10 @@ Ejecutar los checks que apliquen al cambio y reportar el resultado. Si algo fall
 - No duplicar documentación: comportamiento → prompt; uso de tools → docstrings; políticas → código.
 
 ## Tests
-- `pytest`. Un archivo por módulo.
+- `pytest`. Un archivo por módulo para pruebas por capa; pruebas de integración agrupadas por recorrido.
 - Nombre: `test_<unidad>__<escenario>__<resultado_esperado>` en inglés. Ej.: `test_search_text__more_than_15_notes_with_hits__returns_top_15_sorted_by_hits`.
 - Deterministas: sin llamadas reales a APIs de modelos.
+- Cada capa prueba su responsabilidad, sustituyendo las otras cuando no necesita ejecutarlas. Los tests de integración prueban las garantías del recorrido, no acumulan comprobaciones del formato de trazas ni de otros detalles internos ya cubiertos en su capa.
 - Bug: primero el test que lo reproduce, después el arreglo.
 - Priorizar tests esenciales, claros y fáciles de revisar: cada caso debe proteger una política importante, una capacidad que se está incorporando o un bug real, no aumentar cobertura por sí sola. Explicar qué protege cada test propuesto antes de añadirlo.
 - Cada test tiene coste de lectura, comprensión y mantenimiento: imaginar un fallo no basta para justificar un caso separado. Evitar matrices de casos, fixtures o abstracciones innecesarias. TDD debe ayudar a avanzar en el producto, no obligar a recorrer todas las excepciones posibles.

@@ -4,11 +4,8 @@ import pytest
 from pydantic_ai import DeferredToolRequests
 from pydantic_ai.messages import (
     ModelMessage,
-    ModelRequest,
     ModelResponse,
-    TextPart,
     ToolCallPart,
-    ToolReturnPart,
 )
 from pydantic_ai.usage import UsageLimits
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -17,7 +14,6 @@ from pydantic_ai.models.test import TestModel
 from app.guardrails.state import ConversationState
 from app.agent.runtime import create_agent
 from app.shared.config import get_settings
-from app.tools.schemas import NoteHit
 
 
 def test_create_agent__initial_configuration__exposes_management_tools():
@@ -41,68 +37,6 @@ def test_create_agent__initial_configuration__exposes_management_tools():
     ]
     tool = parameters.function_tools[0]
     assert set(tool.parameters_json_schema["properties"]) == {"terms"}
-
-
-def test_create_agent__search_requested__returns_matching_note_to_model(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-):
-    """Un modelo simulado solicita una búsqueda real y recibe la nota coincidente.
-    Comprueba que solo las notas devueltas quedan registradas como leídas."""
-
-    note_content = "# Ollama\nEjecuta modelos localmente."
-    (tmp_path / "ollama.md").write_text(note_content, encoding="utf-8")
-
-    (tmp_path / "gardening.md").write_text(
-        "# Jardinería\nCuidados del romero.",
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("KB_VAULT_PATH", str(tmp_path))
-    get_settings.cache_clear()
-
-    def simulated_model(
-        messages: list[ModelMessage],
-        info: AgentInfo,
-    ) -> ModelResponse:
-        latest_message = messages[-1]
-        assert isinstance(latest_message, ModelRequest)
-
-        tool_returns = [
-            part for part in latest_message.parts if isinstance(part, ToolReturnPart)
-        ]
-
-        if not tool_returns:
-            return ModelResponse(
-                parts=[
-                    ToolCallPart(
-                        tool_name="search_text",
-                        args={"terms": ["ollama"]},
-                        tool_call_id="search-1",
-                    )
-                ]
-            )
-        tool_return = tool_returns[0]
-        assert tool_return.tool_name == "search_text"
-        assert tool_return.tool_call_id == "search-1"
-        assert tool_return.content == [
-            NoteHit(path="ollama.md", title="ollama", content=note_content, hits=1)
-        ]
-
-        return ModelResponse(parts=[TextPart("Fin de la simulación.")])
-
-    agent = create_agent(FunctionModel(simulated_model))
-    state = ConversationState()
-
-    try:
-        agent.run_sync(
-            "Busca notas sobre Ollama.",
-            deps=state,
-            usage_limits=UsageLimits(request_limit=2),
-        )
-    finally:
-        get_settings.cache_clear()
-
-    assert state.read_notes == {"ollama.md": note_content}
 
 
 @pytest.mark.parametrize(
