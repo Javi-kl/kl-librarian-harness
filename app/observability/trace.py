@@ -1,7 +1,10 @@
 import json
+import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def write_trace_event(
@@ -23,16 +26,26 @@ def record_decision(
     note_path: str,
     decision: str,
 ) -> None:
-    """Registra una decisión con fecha UTC y propaga los errores de escritura."""
-    write_trace_event(
-        trace_path,
-        {
-            "event": "decision",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "conversation_id": conversation_id,
-            "call_id": call_id,
-            "tool": tool_name,
-            "path": note_path,
-            "decision": decision,
-        },
-    )
+    """Registra una decisión; avisa sin interrumpir ante fallos de escritura o codificación."""
+    try:
+        write_trace_event(
+            trace_path,
+            {
+                "event": "decision",
+                "timestamp": datetime.now(UTC).isoformat(),
+                "conversation_id": conversation_id,
+                "call_id": call_id,
+                "tool": tool_name,
+                "path": note_path,
+                "decision": decision,
+            },
+        )
+    except (OSError, UnicodeError) as error:
+        logger.warning(
+            "No se pudo registrar la decisión de %s sobre %s (llamada %s). "
+            "La traza puede quedar incompleta: %s",
+            tool_name,
+            note_path,
+            call_id,
+            error,
+        )

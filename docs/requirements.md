@@ -77,7 +77,11 @@
 	- RNF-01
 	  > **Como** dueño de la KB, **quiero** que todo lo que hace el agente quede en la traza y sea consultable, **para** poder auditar sus acciones y confiar en lo que hizo."
 		- **C1 - Todo en la traza**
-		  DADO QUE el run ha terminado,
+		  DADO QUE el run ha terminado y el registro de la traza ha funcionado,
 		  CUANDO abro la traza,
 		  ENTONCES veo cada escritura/borrado con mi decisión (aprobado/rechazado) y su resultado.
+		- **C2 - Fallo de traza no bloqueante**
+		  DADO QUE falla la escritura o codificación de un evento de la traza,
+		  CUANDO el sistema intenta registrarlo,
+		  ENTONCES avisa por logging y continúa según la decisión del usuario y las validaciones de seguridad; el fallo de traza no autoriza, cancela ni revierte por sí mismo una operación. Se acepta que la traza persistente pueda quedar incompleta.
 ---

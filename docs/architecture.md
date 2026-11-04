@@ -10,7 +10,7 @@
   Runtime (prestado)      ← bucle Pydantic AI
   ─────────────────────────────────────────────
   Transversales: contexto (rellena el prompt) · sesión (estado entre runs)
-                 observabilidad (traza todo) · evals (mide trayectoria)
+                 observabilidad (registra actividad) · evals (mide trayectoria)
   ```
 
 ---
@@ -37,3 +37,8 @@
   decisión:: Guardrails F1: política de aprobación de 3 niveles (leer libre, escribir pide, borrar pide SIEMPRE) + reglas en código: read-before-write (solo mutar notas cuyo contenido completo se haya devuelto al agente durante la conversación actual; registrar en código las rutas y el contenido devueltos, no todos los archivos examinados por la búsqueda). Antes de mostrar el diff o pedir aprobación de borrado, comprobar que la nota sigue coincidiendo con la versión recibida por el agente; si cambió, debe recibir la versión actual y reconsiderar la propuesta. Antes de ejecutar, comprobar de nuevo que sigue siendo la versión sobre la que se aprobó la operación. El registro vive en memoria durante la conversación, sin persistencia entre sesiones. Borrado = mover a vault/trash/ renombrando a `<nombre>.md.trash` (contador `.1`, `.2` si el nombre ya está ocupado; nunca se sobrescribe)
   porque:: la seguridad se hace cumplir en código, no en el prompt del modelo: el prompt se puede eludir. La papelera hace reversible el borrado por error (renombrar de vuelta a `.md` lo recupera) y el rename es atómico dentro del vault. El sufijo va DESPUÉS de `.md` a propósito: así `search_text` (rglob "*.md") no vuelve a encontrar lo borrado y RF-03 C4 se cumple sin tocar la búsqueda.
   alternativa:: auto-aprobar escritura y preguntar solo por borrado - descartada: deja pasar sobrescrituras malas sin revisión; reabrir con más capas en futuras fases del proyecto.
+ ## ADR-006
+  decisión:: Observabilidad no bloqueante: ante fallos de escritura o codificación de la traza JSONL, emitir un aviso por logging y continuar según la decisión del usuario y las validaciones de seguridad. El escritor básico propaga errores; las funciones de registro de eventos gestionan esos fallos operativos. No se ocultan indiscriminadamente errores de programación o construcción del evento.
+  porque:: la traza sirve para diagnóstico y evaluación, no es una auditoría obligatoria de la que dependa la disponibilidad del producto. La aprobación y los guardrails siguen siendo obligatorios e independientes del registro.
+  trade-off:: pueden existir operaciones sin registro persistente y una escritura fallida puede dejar una línea incompleta; el aviso no garantiza una auditoría completa. Un fallo de registro posterior a una mutación no la revierte ni cambia su resultado real. Sin reintentos ni garantías transaccionales en F1.
+  alternativa:: bloquear una mutación si falla el registro de su aprobación - descartada: convierte un fallo de observabilidad en indisponibilidad de la función principal.

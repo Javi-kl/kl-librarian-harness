@@ -92,22 +92,14 @@ def review_pending_operations(
         if decision is None:
             return None
 
-        try:
-            record_decision(
-                trace_path,
-                conversation_id=conversation_id,
-                call_id=call.tool_call_id,
-                tool_name=call.tool_name,
-                note_path=proposal.path,
-                decision=decision,
-            )
-        except (OSError, UnicodeError) as error:
-            logger.error(
-                "No se pudo registrar la decisión. "
-                "No se ha ejecutado ninguna operación pendiente: %s",
-                error,
-            )
-            return None
+        record_decision(
+            trace_path,
+            conversation_id=conversation_id,
+            call_id=call.tool_call_id,
+            tool_name=call.tool_name,
+            note_path=proposal.path,
+            decision=decision,
+        )
 
         if decision == "cancelled":
             logger.info("Revisión cancelada. No se ha ejecutado ninguna operación.")
